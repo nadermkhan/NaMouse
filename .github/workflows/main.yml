@@ -1,0 +1,162 @@
+name: Build and Release Windows EXE
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (e.g., 1.0.0)'
+        required: true
+        default: '1.0.0'
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pyinstaller
+        pip install pandas
+        pip install cryptography
+    
+    - name: Build EXE with PyInstaller
+      run: |
+        pyinstaller --onefile --windowed --name="NaMouse-Automation-Tool" --add-data="*.py;." --hidden-import="cryptography" --hidden-import="pandas" --hidden-import="tkinter" main.py
+    
+    - name: Create Release Package
+      run: |
+        mkdir release-package
+        copy dist\NaMouse-Automation-Tool.exe release-package\
+        
+        echo "CSV LinkedIn URL UnMatcher" > release-package\README.txt
+        echo "For support or license keys, please contact the administrator." >> release-package\README.txt
+        
+        Compress-Archive -Path release-package\* -DestinationPath NaMouse-Automation-Tool.zip
+    
+    - name: Get version info
+      id: version
+      run: |
+        if ("${{ github.ref }}" -match "refs/tags/(.+)") {
+          $version = $matches[1]
+          echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+          echo "RELEASE_NAME=Release $version" >> $env:GITHUB_OUTPUT
+        } else {
+          $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
+          $version = "manual-${{ github.event.inputs.version || '1.0.0' }}-$timestamp"
+          echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+          echo "RELEASE_NAME=Manual Build ${{ github.event.inputs.version || '1.0.0' }} ($timestamp)" >> $env:GITHUB_OUTPUT
+        }
+      shell: powershell
+    
+    - name: Create Release (for tags)
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: |
+          NaMouse-Automation-Tool.zip
+          dist/NaMouse-Automation-Tool.exe
+        body: |
+          ## CSV LinkedIn URL UnMatcher
+          
+          ### Downloads
+          - **Full Package (Recommended)**: `NaMouse-Automation-Tool.zip` - Includes EXE and documentation
+          - **EXE Only**: `NaMouse-Automation-Tool.exe` - Standalone executable
+          
+          ### Features
+          - Match LinkedIn URLs between two CSV files
+          - Licensed application with time-based activation
+          - User-friendly GUI interface
+          - Progress tracking and status updates
+          - Export matched results to CSV
+          
+          ### Installation
+          1. Download `NaMouse-Automation-Tool.zip`
+          2. Extract the zip file to your desired location
+          3. Run `NaMouse-Automation-Tool.exe`
+          4. Enter your license key when prompted
+          
+          ### Usage
+          1. Select your main CSV file (must contain 'Person Linkedin Url' column)
+          2. Select your new table CSV file (must contain 'linkedin_url' column)
+          3. Choose where to save the output file
+          4. Click 'Match URLs' to process the files
+          
+          ### System Requirements
+          - Windows 10 or later (64-bit recommended)
+          - No Python installation required
+          - Approximately 50MB free disk space
+          
+          ### License
+          This software requires a valid license key to operate. Contact your administrator for a license key.
+        generate_release_notes: true
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Create Release (for manual trigger)
+      uses: softprops/action-gh-release@v1
+      if: github.event_name == 'workflow_dispatch'
+      with:
+        tag_name: ${{ steps.version.outputs.VERSION }}
+        name: ${{ steps.version.outputs.RELEASE_NAME }}
+        files: |
+          NaMouse-Automation-Tool.zip
+          dist/NaMouse-Automation-Tool.exe
+        body: |
+          ## NaMouse Automation Tool - Manual Build
+          
+          **Build Type**: Manual trigger
+          **Version**: ${{ github.event.inputs.version || '1.0.0' }}
+          **Build Date**: ${{ github.run_started_at }}
+          
+          ### Downloads
+          - **Full Package (Recommended)**: `NaMouse-Automation-Tool.zip` - Includes EXE and documentation
+          - **EXE Only**: `NaMouse-Automation-Tool.exe` - Standalone executable
+          
+          ### Features
+          - Match LinkedIn URLs between two CSV files
+          - Licensed application with time-based activation
+          - User-friendly GUI interface
+          - Progress tracking and status updates
+          - Export matched results to CSV
+          
+          ### Installation
+          1. Download `NaMouse-Automation-Tool.zip`
+          2. Extract the zip file to your desired location
+          3. Run `NaMouse-Automation-Tool.exe`
+          4. Enter your license key when prompted
+          
+          ### System Requirements
+          - Windows 10 or later (64-bit recommended)
+          - No Python installation required
+          - Approximately 50MB free disk space
+          
+          ### Note
+          This is a manual build and may be a development version. For stable releases, please use tagged versions.
+        draft: false
+        prerelease: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: NaMouse-Automation-Tool-${{ steps.version.outputs.VERSION }}
+        path: |
+          dist/NaMouse-Automation-Tool.exe
+          NaMouse-Automation-Tool.zip
