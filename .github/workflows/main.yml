@@ -35,7 +35,7 @@ jobs:
     
     - name: Build EXE with PyInstaller
       run: |
-        pyinstaller --onefile --windowed --name="NaMouse-Automation-Tool" --add-data="*.py;." --hidden-import="cryptography" --hidden-import="pandas" --hidden-import="tkinter" main.py
+        pyinstaller --onefile --windowed --name="NaMouse-Automation-Tool" --add-data="*.py;." --hidden-import="pynput" --hidden-import="pandas" --hidden-import="tkinter" main.py
     
     - name: Create Release Package
       run: |
